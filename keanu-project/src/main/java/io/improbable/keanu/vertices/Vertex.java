@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableSet;
 import io.improbable.keanu.algorithms.graphtraversal.DiscoverGraph;
 import io.improbable.keanu.algorithms.graphtraversal.VertexValuePropagation;
 import io.improbable.keanu.tensor.Tensor;
-import io.improbable.keanu.vertices.dbl.KeanuRandom;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -12,23 +11,31 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 
-public abstract class Vertex<T> implements Observable<T> {
+public abstract class Vertex<T> implements Observable<T>, Samplable<T>, HasShape {
 
     private final VertexId id = new VertexId();
+    private final long[] initialShape;
+    private final Observable<T> observation;
+
     private Set<Vertex> children = Collections.emptySet();
     private Set<Vertex> parents = Collections.emptySet();
     private T value;
-    private final Observable<T> observation;
     private VertexLabel label = null;
 
     public Vertex() {
+        this(Tensor.SCALAR_SHAPE);
+    }
+
+    public Vertex(long[] initialShape) {
+        this.initialShape = initialShape;
         this.observation = Observable.observableTypeFor(this.getClass());
     }
 
     /**
      * Set a label for this vertex.  This allows easy retrieval of this vertex using nothing but a label name.
+     *
      * @param label The label to apply to this vertex.  Uniqueness is only enforced on instantiation of a Bayes Net
-     * @param <V> vertex type
+     * @param <V>   vertex type
      * @return this
      */
     public <V extends Vertex<T>> V setLabel(VertexLabel label) {
@@ -47,17 +54,6 @@ public abstract class Vertex<T> implements Observable<T> {
     public <V extends Vertex<T>> V removeLabel() {
         this.label = null;
         return (V) this;
-    }
-
-    /**
-     * @param random source of randomness
-     * @return a sample from the vertex's distribution. For non-probabilistic vertices,
-     * this will always be the same value.
-     */
-    public abstract T sample(KeanuRandom random);
-
-    public T sample() {
-        return sample(KeanuRandom.getDefaultRandom());
     }
 
     /**
@@ -123,11 +119,12 @@ public abstract class Vertex<T> implements Observable<T> {
         }
     }
 
+    @Override
     public long[] getShape() {
         if (value instanceof Tensor) {
             return ((Tensor) value).getShape();
         } else {
-            return Tensor.SCALAR_SHAPE;
+            return initialShape;
         }
     }
 
@@ -147,7 +144,7 @@ public abstract class Vertex<T> implements Observable<T> {
      * This marks the vertex's value as being observed and unchangeable.
      * <p>
      * Non-probabilistic vertices of continuous types (integer, double) are prohibited
-     * from being observed due to it's negative impact on inference algorithms. Non-probabilistic
+     * from being observed due to its negative impact on inference algorithms. Non-probabilistic
      * booleans are allowed to be observed as well as user defined types.
      *
      * @param value the value to be observed

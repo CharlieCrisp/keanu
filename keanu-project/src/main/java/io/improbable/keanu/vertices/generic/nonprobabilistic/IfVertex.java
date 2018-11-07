@@ -16,15 +16,15 @@ public class IfVertex<T> extends Vertex<Tensor<T>> implements NonProbabilistic<T
                     Vertex<? extends BooleanTensor> predicate,
                     Vertex<? extends Tensor<T>> thn,
                     Vertex<? extends Tensor<T>> els) {
+        super(shape);
         this.predicate = predicate;
         this.thn = thn;
         this.els = els;
         setParents(predicate, thn, els);
-        setValue(Tensor.placeHolder(shape));
     }
 
     private Tensor<T> op(BooleanTensor predicate, Tensor<T> thn, Tensor<T> els) {
-        return predicate.setIf(thn, els);
+        return predicate.where(thn, els);
     }
 
     @Override
