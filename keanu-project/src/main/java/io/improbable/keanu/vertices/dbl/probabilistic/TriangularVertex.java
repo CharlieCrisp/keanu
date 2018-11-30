@@ -1,9 +1,13 @@
 package io.improbable.keanu.vertices.dbl.probabilistic;
 
+import io.improbable.keanu.annotation.ExportVertexToPythonBindings;
 import io.improbable.keanu.distributions.continuous.Triangular;
 import io.improbable.keanu.tensor.dbl.DoubleTensor;
+import io.improbable.keanu.vertices.LoadVertexParam;
 import io.improbable.keanu.vertices.SamplableWithManyScalars;
+import io.improbable.keanu.vertices.SaveVertexParam;
 import io.improbable.keanu.vertices.Vertex;
+import io.improbable.keanu.vertices.dbl.Differentiable;
 import io.improbable.keanu.vertices.dbl.DoubleVertex;
 import io.improbable.keanu.vertices.dbl.KeanuRandom;
 import io.improbable.keanu.vertices.dbl.nonprobabilistic.ConstantDoubleVertex;
@@ -11,14 +15,17 @@ import io.improbable.keanu.vertices.dbl.nonprobabilistic.ConstantDoubleVertex;
 import java.util.Map;
 import java.util.Set;
 
-import static io.improbable.keanu.tensor.TensorShapeValidation.checkHasSingleNonScalarShapeOrAllScalar;
-import static io.improbable.keanu.tensor.TensorShapeValidation.checkTensorsMatchNonScalarShapeOrAreScalar;
+import static io.improbable.keanu.tensor.TensorShapeValidation.checkHasOneNonLengthOneShapeOrAllLengthOne;
+import static io.improbable.keanu.tensor.TensorShapeValidation.checkTensorsMatchNonLengthOneShapeOrAreLengthOne;
 
-public class TriangularVertex extends DoubleVertex implements ProbabilisticDouble, SamplableWithManyScalars<DoubleTensor> {
+public class TriangularVertex extends DoubleVertex implements Differentiable, ProbabilisticDouble, SamplableWithManyScalars<DoubleTensor> {
 
     private final DoubleVertex xMin;
     private final DoubleVertex xMax;
     private final DoubleVertex c;
+    private static final String X_MIN_NAME = "xMin";
+    private static final String X_MAX_NAME = "xMax";
+    private static final String C_NAME = "c";
 
     /**
      * One xMin, xMax, c or all three that match a proposed tensor shape of Triangular
@@ -32,7 +39,7 @@ public class TriangularVertex extends DoubleVertex implements ProbabilisticDoubl
      */
     public TriangularVertex(long[] tensorShape, DoubleVertex xMin, DoubleVertex xMax, DoubleVertex c) {
         super(tensorShape);
-        checkTensorsMatchNonScalarShapeOrAreScalar(tensorShape, xMin.getShape(), xMax.getShape(), c.getShape());
+        checkTensorsMatchNonLengthOneShapeOrAreLengthOne(tensorShape, xMin.getShape(), xMax.getShape(), c.getShape());
 
         this.xMin = xMin;
         this.xMax = xMax;
@@ -71,8 +78,11 @@ public class TriangularVertex extends DoubleVertex implements ProbabilisticDoubl
      * @param xMax the xMax of the Triangular with either the same shape as specified for this vertex or a scalar
      * @param c    the c of the Triangular with either the same shape as specified for this vertex or a scalar
      */
-    public TriangularVertex(DoubleVertex xMin, DoubleVertex xMax, DoubleVertex c) {
-        this(checkHasSingleNonScalarShapeOrAllScalar(xMin.getShape(), xMax.getShape(), c.getShape()), xMin, xMax, c);
+    @ExportVertexToPythonBindings
+    public TriangularVertex(@LoadVertexParam(X_MIN_NAME) DoubleVertex xMin,
+                            @LoadVertexParam(X_MAX_NAME) DoubleVertex xMax,
+                            @LoadVertexParam(C_NAME) DoubleVertex c) {
+        this(checkHasOneNonLengthOneShapeOrAllLengthOne(xMin.getShape(), xMax.getShape(), c.getShape()), xMin, xMax, c);
     }
 
     public TriangularVertex(DoubleVertex xMin, DoubleVertex xMax, double c) {
@@ -97,6 +107,21 @@ public class TriangularVertex extends DoubleVertex implements ProbabilisticDoubl
 
     public TriangularVertex(double xMin, double xMax, double c) {
         this(new ConstantDoubleVertex(xMin), new ConstantDoubleVertex(xMax), new ConstantDoubleVertex(c));
+    }
+
+    @SaveVertexParam(X_MIN_NAME)
+    public DoubleVertex getXMin() {
+        return xMin;
+    }
+
+    @SaveVertexParam(X_MAX_NAME)
+    public DoubleVertex getXMax() {
+        return xMax;
+    }
+
+    @SaveVertexParam(C_NAME)
+    public DoubleVertex getC() {
+        return c;
     }
 
     @Override

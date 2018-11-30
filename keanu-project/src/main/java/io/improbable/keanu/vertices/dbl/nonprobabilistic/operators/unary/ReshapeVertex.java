@@ -2,17 +2,23 @@ package io.improbable.keanu.vertices.dbl.nonprobabilistic.operators.unary;
 
 import io.improbable.keanu.tensor.TensorShape;
 import io.improbable.keanu.tensor.dbl.DoubleTensor;
+import io.improbable.keanu.vertices.LoadVertexParam;
+import io.improbable.keanu.vertices.SaveVertexParam;
 import io.improbable.keanu.vertices.Vertex;
 import io.improbable.keanu.vertices.VertexId;
+import io.improbable.keanu.vertices.dbl.Differentiable;
 import io.improbable.keanu.vertices.dbl.DoubleVertex;
 import io.improbable.keanu.vertices.dbl.nonprobabilistic.diff.PartialDerivatives;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class ReshapeVertex extends DoubleUnaryOpVertex {
+public class ReshapeVertex extends DoubleUnaryOpVertex implements Differentiable {
 
-    public ReshapeVertex(DoubleVertex inputVertex, long... proposedShape) {
+    private static final String PROPOSED_SHAPE_NAME = "proposedShape";
+
+    public ReshapeVertex(@LoadVertexParam(INPUT_VERTEX_NAME) DoubleVertex inputVertex,
+                         @LoadVertexParam(PROPOSED_SHAPE_NAME) long... proposedShape) {
         super(proposedShape, inputVertex);
     }
 
@@ -22,7 +28,8 @@ public class ReshapeVertex extends DoubleUnaryOpVertex {
     }
 
     @Override
-    protected PartialDerivatives forwardModeAutoDifferentiation(PartialDerivatives derivativeOfParentWithRespectToInputs) {
+    public PartialDerivatives forwardModeAutoDifferentiation(Map<Vertex, PartialDerivatives> derivativeOfParentsWithRespectToInputs) {
+        PartialDerivatives derivativeOfParentWithRespectToInputs = derivativeOfParentsWithRespectToInputs.get(inputVertex);
         return derivativeOfParentWithRespectToInputs.reshape(inputVertex.getValue().getRank(), getShape());
     }
 
@@ -43,4 +50,8 @@ public class ReshapeVertex extends DoubleUnaryOpVertex {
         return reshapedDerivatives;
     }
 
+    @SaveVertexParam(PROPOSED_SHAPE_NAME)
+    public long[] getProposedShape() {
+        return getShape();
+    }
 }

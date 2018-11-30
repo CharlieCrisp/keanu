@@ -3,10 +3,13 @@ package io.improbable.keanu.vertices.dbl.nonprobabilistic;
 import com.google.common.collect.Iterables;
 import io.improbable.keanu.tensor.Tensor;
 import io.improbable.keanu.tensor.dbl.DoubleTensor;
+import io.improbable.keanu.vertices.LoadVertexParam;
 import io.improbable.keanu.vertices.NonProbabilistic;
 import io.improbable.keanu.vertices.ProxyVertex;
+import io.improbable.keanu.vertices.SaveVertexParam;
 import io.improbable.keanu.vertices.Vertex;
 import io.improbable.keanu.vertices.VertexLabel;
+import io.improbable.keanu.vertices.dbl.Differentiable;
 import io.improbable.keanu.vertices.dbl.DoubleVertex;
 import io.improbable.keanu.vertices.dbl.KeanuRandom;
 import io.improbable.keanu.vertices.dbl.nonprobabilistic.diff.PartialDerivatives;
@@ -14,9 +17,11 @@ import io.improbable.keanu.vertices.dbl.nonprobabilistic.diff.PartialDerivatives
 import java.util.Collections;
 import java.util.Map;
 
-import static io.improbable.keanu.tensor.TensorShapeValidation.checkTensorsMatchNonScalarShapeOrAreScalar;
+import static io.improbable.keanu.tensor.TensorShapeValidation.checkTensorsMatchNonLengthOneShapeOrAreLengthOne;
 
-public class DoubleProxyVertex extends DoubleVertex implements ProxyVertex<DoubleVertex>, NonProbabilistic<DoubleTensor> {
+public class DoubleProxyVertex extends DoubleVertex implements Differentiable, ProxyVertex<DoubleVertex>, NonProbabilistic<DoubleTensor> {
+
+    private static final String LABEL_PARAM_NAME = "label";
 
     /**
      * This vertex acts as a "Proxy" to allow a BayesNet to be built up before parents are explicitly known (ie for
@@ -33,6 +38,10 @@ public class DoubleProxyVertex extends DoubleVertex implements ProxyVertex<Doubl
         this.setLabel(label);
     }
 
+    public DoubleProxyVertex(@LoadVertexParam(LABEL_PARAM_NAME) String label) {
+        this(new VertexLabel(label));
+    }
+
     @Override
     public DoubleTensor calculate() {
         return getParent().getValue();
@@ -45,7 +54,7 @@ public class DoubleProxyVertex extends DoubleVertex implements ProxyVertex<Doubl
 
     @Override
     public void setParent(DoubleVertex newParent) {
-        checkTensorsMatchNonScalarShapeOrAreScalar(getShape(), newParent.getShape());
+        checkTensorsMatchNonLengthOneShapeOrAreLengthOne(getShape(), newParent.getShape());
         setParents(newParent);
     }
 
@@ -66,6 +75,11 @@ public class DoubleProxyVertex extends DoubleVertex implements ProxyVertex<Doubl
     @Override
     public Map<Vertex, PartialDerivatives> reverseModeAutoDifferentiation(PartialDerivatives derivativeOfOutputsWithRespectToSelf) {
         return Collections.singletonMap(getParent(), derivativeOfOutputsWithRespectToSelf);
+    }
+
+    @SaveVertexParam(LABEL_PARAM_NAME)
+    public String getLabelParameter() {
+        return getLabel().toString();
     }
 
 }

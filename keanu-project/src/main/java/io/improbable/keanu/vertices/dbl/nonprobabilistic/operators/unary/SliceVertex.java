@@ -2,8 +2,11 @@ package io.improbable.keanu.vertices.dbl.nonprobabilistic.operators.unary;
 
 import io.improbable.keanu.tensor.TensorShape;
 import io.improbable.keanu.tensor.dbl.DoubleTensor;
+import io.improbable.keanu.vertices.LoadVertexParam;
+import io.improbable.keanu.vertices.SaveVertexParam;
 import io.improbable.keanu.vertices.Vertex;
 import io.improbable.keanu.vertices.VertexId;
+import io.improbable.keanu.vertices.dbl.Differentiable;
 import io.improbable.keanu.vertices.dbl.DoubleVertex;
 import io.improbable.keanu.vertices.dbl.nonprobabilistic.diff.PartialDerivatives;
 
@@ -12,10 +15,12 @@ import java.util.Map;
 
 import static io.improbable.keanu.tensor.TensorShape.shapeSlice;
 
-public class SliceVertex extends DoubleUnaryOpVertex {
+public class SliceVertex extends DoubleUnaryOpVertex implements Differentiable {
 
     private final int dimension;
     private final long index;
+    private final static String DIMENSION_NAME = "dimension";
+    private final static String INDEX_NAME = "index";
 
     /**
      * Takes the slice along a given dimension and index of a vertex
@@ -24,7 +29,9 @@ public class SliceVertex extends DoubleUnaryOpVertex {
      * @param dimension   the dimension to extract along
      * @param index       the index of extraction
      */
-    public SliceVertex(DoubleVertex inputVertex, int dimension, long index) {
+    public SliceVertex(@LoadVertexParam(INPUT_VERTEX_NAME) DoubleVertex inputVertex,
+                       @LoadVertexParam(DIMENSION_NAME) int dimension,
+                       @LoadVertexParam(INDEX_NAME) long index) {
         super(shapeSlice(dimension, inputVertex.getShape()), inputVertex);
         this.dimension = dimension;
         this.index = index;
@@ -50,7 +57,8 @@ public class SliceVertex extends DoubleUnaryOpVertex {
     }
 
     @Override
-    protected PartialDerivatives forwardModeAutoDifferentiation(PartialDerivatives derivativeOfParentWithRespectToInputs) {
+    public PartialDerivatives forwardModeAutoDifferentiation(Map<Vertex, PartialDerivatives> derivativeOfParentsWithRespectToInputs) {
+        PartialDerivatives derivativeOfParentWithRespectToInputs = derivativeOfParentsWithRespectToInputs.get(inputVertex);
         boolean needReshape = this.getValue().getRank() == inputVertex.getValue().getRank();
         return derivativeOfParentWithRespectToInputs.slice(dimension, index, needReshape);
     }
@@ -78,4 +86,13 @@ public class SliceVertex extends DoubleUnaryOpVertex {
         return outputTensor;
     }
 
+    @SaveVertexParam(DIMENSION_NAME)
+    public int getDimension() {
+        return dimension;
+    }
+
+    @SaveVertexParam(INDEX_NAME)
+    public long getIndex() {
+        return index;
+    }
 }

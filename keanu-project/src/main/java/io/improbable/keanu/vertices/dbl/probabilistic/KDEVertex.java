@@ -3,8 +3,11 @@ package io.improbable.keanu.vertices.dbl.probabilistic;
 import io.improbable.keanu.distributions.continuous.Uniform;
 import io.improbable.keanu.tensor.Tensor;
 import io.improbable.keanu.tensor.dbl.DoubleTensor;
+import io.improbable.keanu.vertices.LoadVertexParam;
 import io.improbable.keanu.vertices.Samplable;
+import io.improbable.keanu.vertices.SaveVertexParam;
 import io.improbable.keanu.vertices.Vertex;
+import io.improbable.keanu.vertices.dbl.Differentiable;
 import io.improbable.keanu.vertices.dbl.DoubleVertex;
 import io.improbable.keanu.vertices.dbl.KeanuRandom;
 
@@ -13,12 +16,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class KDEVertex extends DoubleVertex implements ProbabilisticDouble, Samplable<DoubleTensor> {
+public class KDEVertex extends DoubleVertex implements Differentiable, ProbabilisticDouble, Samplable<DoubleTensor> {
 
     private final double bandwidth;
     private DoubleTensor samples;
+    private static final String BANDWIDTH_NAME = "bandwidth";
+    private static final String SAMPLES_NAME = "samples";
 
-    public KDEVertex(DoubleTensor samples, double bandwidth) {
+    public KDEVertex(@LoadVertexParam(SAMPLES_NAME) DoubleTensor samples, @LoadVertexParam(BANDWIDTH_NAME) double bandwidth) {
         super(Tensor.SCALAR_SHAPE);
         if (samples.getLength() == 0) {
             throw new IllegalStateException("The provided tensor of samples is empty!");
@@ -34,7 +39,7 @@ public class KDEVertex extends DoubleVertex implements ProbabilisticDouble, Samp
     public KDEVertex(List<Double> samples) {
         this(DoubleTensor.create(samples.stream()
             .mapToDouble(Double::doubleValue)
-            .toArray(), new long[]{samples.size(), 1}));
+            .toArray(), new long[]{samples.size()}));
     }
 
     public KDEVertex(List<Double> samples, double bandwidth) {
@@ -43,9 +48,19 @@ public class KDEVertex extends DoubleVertex implements ProbabilisticDouble, Samp
             .toArray()), bandwidth);
     }
 
+    @SaveVertexParam(BANDWIDTH_NAME)
+    public double getBandwidth() {
+        return bandwidth;
+    }
+
+    @SaveVertexParam(SAMPLES_NAME)
+    public DoubleTensor getInputSamples() {
+        return samples;
+    }
+
     private DoubleTensor getDiffs(DoubleTensor x) {
-        DoubleTensor diffs = DoubleTensor.zeros(new long[]{samples.getShape()[0], x.getShape()[1]});
-        return diffs.plusInPlace(x).minusInPlace(samples).divInPlace(bandwidth);
+        DoubleTensor diffs = DoubleTensor.zeros(samples.getShape()[0], x.getShape()[0]);
+        return diffs.plusInPlace(x.reshape(1, x.getShape()[0])).minusInPlace(samples.reshape(samples.getShape()[0], 1)).divInPlace(bandwidth);
     }
 
     public DoubleTensor pdf(DoubleTensor x) {
@@ -91,7 +106,7 @@ public class KDEVertex extends DoubleVertex implements ProbabilisticDouble, Samp
         DoubleTensor value = Uniform.withParameters(
             DoubleTensor.scalar(0),
             DoubleTensor.scalar(samples.getLength())
-        ).sample(new long[]{1, nSamples}, random);
+        ).sample(new long[]{nSamples}, random);
 
         DoubleTensor index = value.floorInPlace();
         double[] shuffledSamples = new double[nSamples];
@@ -102,7 +117,7 @@ public class KDEVertex extends DoubleVertex implements ProbabilisticDouble, Samp
         }
 
         DoubleTensor sampleMus = DoubleTensor.create(shuffledSamples);
-        return random.nextGaussian(new long[]{1, nSamples}).timesInPlace(bandwidth).plusInPlace(sampleMus);
+        return random.nextGaussian(new long[]{nSamples}).timesInPlace(bandwidth).plusInPlace(sampleMus);
     }
 
     @Override

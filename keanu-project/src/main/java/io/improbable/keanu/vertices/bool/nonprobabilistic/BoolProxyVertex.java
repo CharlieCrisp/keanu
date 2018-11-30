@@ -3,15 +3,19 @@ package io.improbable.keanu.vertices.bool.nonprobabilistic;
 import com.google.common.collect.Iterables;
 import io.improbable.keanu.tensor.Tensor;
 import io.improbable.keanu.tensor.bool.BooleanTensor;
+import io.improbable.keanu.vertices.LoadVertexParam;
 import io.improbable.keanu.vertices.NonProbabilistic;
 import io.improbable.keanu.vertices.ProxyVertex;
+import io.improbable.keanu.vertices.SaveVertexParam;
 import io.improbable.keanu.vertices.VertexLabel;
 import io.improbable.keanu.vertices.bool.BoolVertex;
 import io.improbable.keanu.vertices.dbl.KeanuRandom;
 
-import static io.improbable.keanu.tensor.TensorShapeValidation.checkTensorsMatchNonScalarShapeOrAreScalar;
+import static io.improbable.keanu.tensor.TensorShapeValidation.checkTensorsMatchNonLengthOneShapeOrAreLengthOne;
 
 public class BoolProxyVertex extends BoolVertex implements ProxyVertex<BoolVertex>, NonProbabilistic<BooleanTensor> {
+
+    private final static String LABEL_NAME = "label";
 
     /**
      * This vertex acts as a "Proxy" to allow a BayesNet to be built up before parents are explicitly known (ie for
@@ -28,6 +32,10 @@ public class BoolProxyVertex extends BoolVertex implements ProxyVertex<BoolVerte
         this.setLabel(label);
     }
 
+    public BoolProxyVertex(@LoadVertexParam(LABEL_NAME) String label) {
+        this(new VertexLabel(label));
+    }
+
     @Override
     public BooleanTensor calculate() {
         return getParent().getValue();
@@ -40,7 +48,7 @@ public class BoolProxyVertex extends BoolVertex implements ProxyVertex<BoolVerte
 
     @Override
     public void setParent(BoolVertex newParent) {
-        checkTensorsMatchNonScalarShapeOrAreScalar(getShape(), newParent.getShape());
+        checkTensorsMatchNonLengthOneShapeOrAreLengthOne(getShape(), newParent.getShape());
         setParents(newParent);
     }
 
@@ -53,4 +61,8 @@ public class BoolProxyVertex extends BoolVertex implements ProxyVertex<BoolVerte
         return !getParents().isEmpty();
     }
 
+    @SaveVertexParam(LABEL_NAME)
+    public String getLabelParameter() {
+        return getLabel().toString();
+    }
 }

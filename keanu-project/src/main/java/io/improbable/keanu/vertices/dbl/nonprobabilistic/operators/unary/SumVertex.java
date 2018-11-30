@@ -1,23 +1,27 @@
 package io.improbable.keanu.vertices.dbl.nonprobabilistic.operators.unary;
 
-import com.google.common.primitives.Longs;
+import com.google.common.base.Preconditions;
+import io.improbable.keanu.annotation.ExportVertexToPythonBindings;
 import io.improbable.keanu.tensor.TensorShape;
 import io.improbable.keanu.tensor.dbl.DoubleTensor;
+import io.improbable.keanu.vertices.LoadVertexParam;
+import io.improbable.keanu.vertices.SaveVertexParam;
 import io.improbable.keanu.vertices.Vertex;
 import io.improbable.keanu.vertices.VertexId;
+import io.improbable.keanu.vertices.dbl.Differentiable;
 import io.improbable.keanu.vertices.dbl.DoubleVertex;
 import io.improbable.keanu.vertices.dbl.nonprobabilistic.diff.PartialDerivatives;
+import org.apache.commons.lang3.ArrayUtils;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.singletonMap;
 
-public class SumVertex extends DoubleUnaryOpVertex {
+public class SumVertex extends DoubleUnaryOpVertex implements Differentiable {
 
+    private static final String DIMENSIONS_NAME = "overDimensions";
     private final int[] overDimensions;
 
     /**
@@ -26,7 +30,8 @@ public class SumVertex extends DoubleUnaryOpVertex {
      * @param inputVertex    the vertex to have its values summed
      * @param overDimensions dimensions to sum over
      */
-    public SumVertex(DoubleVertex inputVertex, int[] overDimensions) {
+    public SumVertex(@LoadVertexParam(INPUT_VERTEX_NAME) DoubleVertex inputVertex,
+                     @LoadVertexParam(DIMENSIONS_NAME) int[] overDimensions) {
         super(getSummationResultShape(inputVertex.getShape(), overDimensions), inputVertex);
         this.overDimensions = overDimensions;
     }
@@ -36,40 +41,18 @@ public class SumVertex extends DoubleUnaryOpVertex {
      *
      * @param inputVertex the vertex to have its values summed
      */
+    @ExportVertexToPythonBindings
     public SumVertex(DoubleVertex inputVertex) {
         this(inputVertex, TensorShape.dimensionRange(0, inputVertex.getShape().length));
     }
 
     private static long[] getSummationResultShape(long[] inputShape, int[] sumOverDimensions) {
-        List<Long> inputShapeList = new ArrayList<>(Longs.asList(inputShape));
-
-        zeroOutSummedDimensions(inputShapeList, sumOverDimensions);
-
-        return removeZerosWhenRankGreaterThan2(inputShapeList);
-    }
-
-    private static void zeroOutSummedDimensions(List<Long> inputShapeList, int[] sumOverDimensions) {
-        for (int dim : sumOverDimensions) {
-            inputShapeList.set(dim, 0l);
+        if (inputShape.length > 0) {
+            return ArrayUtils.removeAll(inputShape, sumOverDimensions);
+        } else {
+            Preconditions.checkArgument(sumOverDimensions.length == 0);
+            return inputShape;
         }
-    }
-
-    /**
-     * This is here due to strange behavior in tensor summing over dimensions where
-     * dimensions are not dropped if the rank is 2 or less.
-     */
-    private static long[] removeZerosWhenRankGreaterThan2(List<Long> inputShapeList) {
-        for (int i = inputShapeList.size() - 1; i >= 0; i--) {
-            if (inputShapeList.get(i) == 0) {
-                if (inputShapeList.size() > 2) {
-                    inputShapeList.remove(i);
-                } else {
-                    inputShapeList.set(i, 1l);
-                }
-            }
-        }
-
-        return Longs.toArray(inputShapeList);
     }
 
     @Override
@@ -78,7 +61,8 @@ public class SumVertex extends DoubleUnaryOpVertex {
     }
 
     @Override
-    protected PartialDerivatives forwardModeAutoDifferentiation(PartialDerivatives derivativeOfParentWithRespectToInputs) {
+    public PartialDerivatives forwardModeAutoDifferentiation(Map<Vertex, PartialDerivatives> derivativeOfParentsWithRespectToInputs) {
+        PartialDerivatives derivativeOfParentWithRespectToInputs = derivativeOfParentsWithRespectToInputs.get(inputVertex);
         DoubleTensor sumResult = this.getValue();
         int operandRank = inputVertex.getValue().getRank();
         return derivativeOfParentWithRespectToInputs.sumOverOfDimensions(overDimensions, sumResult.getShape(), operandRank);
@@ -123,5 +107,10 @@ public class SumVertex extends DoubleUnaryOpVertex {
             shapeCopy[sumOverDimension] = 1;
         }
         return shapeCopy;
+    }
+
+    @SaveVertexParam(DIMENSIONS_NAME)
+    public int[] getOverDimensions() {
+        return overDimensions;
     }
 }
